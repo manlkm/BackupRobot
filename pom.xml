@@ -16,13 +16,6 @@
 	</properties>
 
 	<dependencies>
-		<!-- <dependency>
-			<groupId>com.github.sardine</groupId>
-			<artifactId>sardine</artifactId>
-			<version>5.7</version>
-			<scope>system</scope>
-			<systemPath>/home/manlkm/workspace/BackupRobot2/lib/sardine-5.7-SNAPSHOT.jar</systemPath>
-		</dependency> -->
 		<dependency>
 			<groupId>com.github.lookfirst</groupId>
 			<artifactId>sardine</artifactId>
