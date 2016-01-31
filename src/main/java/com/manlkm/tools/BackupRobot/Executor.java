@@ -15,10 +15,10 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Properties;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
@@ -33,9 +33,9 @@ import com.github.sardine.SardineFactory;
  *
  */
 public class Executor {
-	private static String HOST = "http://lw.manlkm.com:5005";
+	private static String HOST = null;
 	
-	private static String downloadToPath = "/home/manlkm/cchServerTest/";
+	private static String downloadToPath = null;
 	
 	private static String DOWNLOAD_FILE_NAME = "download.dat";
 	
@@ -44,12 +44,20 @@ public class Executor {
 	private static int noOfFileToBeDownloaded = 0;
 	
 	private static Writer out = null;
+	
+	private static String webDavLoginUser = null;
+	
+	private static String webDavLoginPwd = null;
+	
 	/**
 	 * @param args
 	 * @throws IOException 
 	 */
 	public static void main(String[] args) throws IOException {
-		Sardine sardine = SardineFactory.begin("readuser", "readuser123");
+		/** Setting initialization **/
+		initSetting();
+		
+		Sardine sardine = SardineFactory.begin(webDavLoginUser, webDavLoginPwd);
 		String rootLevels[] = {"/photos/Man"};
 		
 		out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(FilenameUtils.concat(downloadToPath, DOWNLOAD_FILE_NAME)), "UTF-8"));
@@ -74,6 +82,19 @@ public class Executor {
 		
 	}
 	
+	private static void initSetting() throws IOException{
+		Properties props = new Properties();
+		try(InputStream resourceStream = Thread.currentThread().getContextClassLoader().getResourceAsStream("config.properties")) {
+		    props.load(resourceStream);
+		}
+		
+		HOST = props.getProperty("webdav.url");
+		downloadToPath = props.getProperty("local.downloadTo");
+		ENABLE_ROOT_LEVEL = Boolean.parseBoolean(props.getProperty("enableRootLevel"));
+		webDavLoginUser = props.getProperty("webdav.username");
+		webDavLoginPwd = props.getProperty("webdav.password");
+	}
+	
 	private static void traverseRes(String path, String rootLevel, Sardine sardine) throws IOException{
 		List<DavResource> resources = sardine.list(HOST + path, 1);
 		int rootLevelCount = 0;
@@ -85,24 +106,15 @@ public class Executor {
 				//add to download file if the file does not exist in local or size not match
 				if(!isLocalExist(localPath) || (isLocalExist(localPath) && res.getContentLength().longValue() != new File(localPath).length())){
 					Path toBeCreated = Paths.get(downloadToPath, res.toString().replace(rootLevel, ""));
-					//System.out.println(">> Downloading " + UriUtils.encodeHttpUrl(HOST+res.toString(), "UTF-8") + " > " + toBeCreated);
-					//File file = toBeCreated.toFile();
 					if(!res.isDirectory()){
 						out.write("F|"+UriUtils.encodeHttpUrl(HOST+res.toString(), "UTF-8") + "|" + toBeCreated + System.lineSeparator());
-						/*InputStream inStream = sardine.get(UriUtils.encodeHttpUrl(HOST+res.toString(), "UTF-8"));
-						file = toBeCreated.toFile();
-						OutputStream outputStream = new FileOutputStream(file);
-						IOUtils.copy(inStream, outputStream);
-						outputStream.close();*/
 					}
 					else{
 						out.write("D|"+UriUtils.encodeHttpUrl(HOST+res.toString(), "UTF-8") + "|" + toBeCreated + System.lineSeparator());
-						//file.mkdirs();
 					}
 					
 					noOfFileToBeDownloaded++;
 					toBeCreated = null;
-					//System.out.println("<< Download completed");
 				}
 				if(res.isDirectory()){
 					traverseRes(res.getHref().toString(), rootLevel, sardine);
@@ -158,6 +170,7 @@ public class Executor {
 			in.close();
 		}
 	}
+	
 	private static boolean isLocalExist(String path){
 		return new File(path).exists();
 	}

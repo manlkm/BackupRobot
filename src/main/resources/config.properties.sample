@@ -1,0 +1,8 @@
+### Server setting ###
+webdav.url=http://XXXX:1000
+webdav.username=myuser
+webdav.password=mypwd
+
+### Local setting ###
+local.downloadTo=/path/to
+enableRootLevel=false
