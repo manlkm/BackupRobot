@@ -13,10 +13,13 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Date;
 import java.util.List;
 import java.util.Properties;
 
@@ -27,6 +30,7 @@ import org.springframework.web.util.UriUtils;
 import com.github.sardine.DavResource;
 import com.github.sardine.Sardine;
 import com.github.sardine.SardineFactory;
+import com.sun.swing.internal.plaf.metal.resources.metal_zh_TW;
 
 /**
  * @author manlkm
@@ -49,59 +53,101 @@ public class Executor {
 	
 	private static String webDavLoginPwd = null;
 	
+	private static String webDavSrcDirs[] = null;
+	
+	private static String senderEmail = null;
+	
+	private static String receiverEmail = null;
+	
+	private static String smtpHost = null;
+	
+	private static String runningIntervalMs = null;
+	
+	private static String runningDelayMs = null;
+	
 	/**
 	 * @param args
 	 * @throws IOException 
+	 * @throws InterruptedException 
+	 * @throws NumberFormatException 
 	 */
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) throws IOException, NumberFormatException, InterruptedException {
 		/** Setting initialization **/
-		initSetting();
-		
-		Sardine sardine = SardineFactory.begin(webDavLoginUser, webDavLoginPwd);
-		String rootLevels[] = {"/photos/Man"};
-		
-		out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(FilenameUtils.concat(downloadToPath, DOWNLOAD_FILE_NAME)), "UTF-8"));
-        
-		/** Genereate the download list in advance **/
-		for(String rootLevel : rootLevels){
-			try{
-				traverseRes(rootLevel, rootLevel, sardine);
-			}catch(Exception e){
-				e.printStackTrace();
-			}finally {
-				out.close();
-			}
+		if(args.length < 1){
+			System.out.println("Usage: Executor <config path>");
+			System.exit(1);
 		}
 		
-		System.out.println("No. of files downloaded: " + noOfFileToBeDownloaded);
+		String configPath = args[0];
+		initSetting(configPath);
 		
-		/** Download actually **/
-		downloadFiles(sardine);
-		
-		
+		while (true) {
+			Thread.sleep(Integer.parseInt(runningDelayMs));
+			Sardine sardine = SardineFactory.begin(webDavLoginUser, webDavLoginPwd);
+			//String rootLevels[] = {"/photos/Man"};
+			
+			out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(FilenameUtils.concat(downloadToPath, DOWNLOAD_FILE_NAME)), "UTF-8"));
+	        
+			/** Genereate the download list in advance **/
+			for(String webDavSrcDir : webDavSrcDirs){
+				try{
+					traverseRes(webDavSrcDir, webDavSrcDir, sardine);
+				}catch(Exception e){
+					StringWriter errors = new StringWriter();
+					e.printStackTrace(new PrintWriter(errors));
+					System.out.println(errors.toString());
+					EmailSender.sendEmail(senderEmail, receiverEmail,smtpHost, 
+							"[BackupRobot] Backup failed at " + new Date(),
+							errors.toString());
+					System.exit(1);
+				}finally {
+					out.close();
+				}
+			}
+			
+			EmailSender.sendEmail(senderEmail, receiverEmail,smtpHost, 
+					"[BackupRobot] Backup started at " + new Date(),
+					"Starting to download " + noOfFileToBeDownloaded + " file(s)");
+			System.out.println("Starting to download " + noOfFileToBeDownloaded + " file(s)");
+			
+			/** Download actually **/
+			downloadFiles(sardine);
+			EmailSender.sendEmail(senderEmail, receiverEmail,smtpHost, 
+					"[BackupRobot] Backup completed at " + new Date(),
+					"Finished to download " + noOfFileToBeDownloaded + " file(s)");
+			
+			Thread.sleep(Integer.parseInt(runningIntervalMs));
+		}
 		
 	}
 	
-	private static void initSetting() throws IOException{
+	private static void initSetting(String configPath) throws IOException{
 		Properties props = new Properties();
-		try(InputStream resourceStream = Thread.currentThread().getContextClassLoader().getResourceAsStream("config.properties")) {
+		/*try(InputStream resourceStream = Thread.currentThread().getContextClassLoader().getResourceAsStream("config.properties")) {
 		    props.load(resourceStream);
-		}
+		}*/
+		props.load(new FileInputStream(new File(configPath)));
 		
 		HOST = props.getProperty("webdav.url");
 		downloadToPath = props.getProperty("local.downloadTo");
 		ENABLE_ROOT_LEVEL = Boolean.parseBoolean(props.getProperty("enableRootLevel"));
 		webDavLoginUser = props.getProperty("webdav.username");
 		webDavLoginPwd = props.getProperty("webdav.password");
+		webDavSrcDirs = props.getProperty("webdav.srcdirs").split(",");
+		senderEmail = props.getProperty("sender.email");
+		receiverEmail = props.getProperty("receiver.email");
+		smtpHost = props.getProperty("smtp.host");
+		runningIntervalMs = props.getProperty("running.interval.ms");
+		runningDelayMs = props.getProperty("running.interval.ms");
 	}
 	
 	private static void traverseRes(String path, String rootLevel, Sardine sardine) throws IOException{
-		List<DavResource> resources = sardine.list(HOST + path, 1);
+		List<DavResource> resources = sardine.list(UriUtils.encodeHttpUrl(HOST + path, "UTF-8"), 1);
 		int rootLevelCount = 0;
 		for (DavResource res : resources)
 		{
 			if(rootLevelCount > 0){
-				System.out.println(res);
+				//System.out.println(res);
 				String localPath = ENABLE_ROOT_LEVEL?res.toString():Paths.get(downloadToPath, res.toString().replace(rootLevel, "")).toString();
 				//add to download file if the file does not exist in local or size not match
 				if(!isLocalExist(localPath) || (isLocalExist(localPath) && res.getContentLength().longValue() != new File(localPath).length())){
@@ -144,7 +190,7 @@ public class Executor {
 				if(info.length != 3){
 					throw new Exception("Incorrect format in file line: " + line);
 				}
-				System.out.println(">> Downloading " + info[1] + " > " + info[2]);
+				//System.out.println(">> Downloading " + info[1] + " > " + info[2]);
 				File file = new File(info[2]);
 				
 				if(!"D".equals(info[0])){ //not a directory
@@ -157,7 +203,7 @@ public class Executor {
 					file.mkdirs();
 				}
 				
-				System.out.println("<< Download completed");
+				//System.out.println("<< Download completed");
 			}
 
 		} catch (UnsupportedEncodingException e){

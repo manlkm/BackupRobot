@@ -6,3 +6,10 @@ webdav.password=mypwd
 ### Local setting ###
 local.downloadTo=/path/to
 enableRootLevel=false
+running.delay.ms=2000
+running.interval.ms=10000
+
+### Email setting ###
+sender.email=
+receiver.email=
+smtp.host=

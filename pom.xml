@@ -42,6 +42,12 @@
 			<artifactId>spring-web</artifactId>
 			<version>3.0.4.RELEASE</version>
 		</dependency>
+		<dependency>
+			<groupId>javax.mail</groupId>
+			<artifactId>mail</artifactId>
+			<version>1.4</version>
+		</dependency>
+				
 
 		<!-- ant and junit must be defined as provided for a successful compile. -->
 		<dependency>
@@ -76,8 +82,9 @@
 						</goals>
 						<configuration>
 							<mainClass>com.manlkm.tools.BackupRobot.Executor</mainClass>
-							<!-- <arguments> <argument>arg0</argument> <argument>arg1</argument> 
-								</arguments> -->
+							<arguments>
+								<argument>/home/manlkm/workspace/BackupRobot/src/main/resources/config.properties</argument> 
+							</arguments>
 						</configuration>
 					</execution>
 				</executions>
