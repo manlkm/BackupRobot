@@ -17,6 +17,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
+import java.net.InetAddress;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Date;
@@ -79,43 +80,48 @@ public class Executor {
 		}
 		
 		String configPath = args[0];
+		String hostname = InetAddress.getLocalHost().getHostName();
 		initSetting(configPath);
 		
 		while (true) {
+			System.out.println("backup-robot started at " + new Date());
+			noOfFileToBeDownloaded = 0;
 			Thread.sleep(Integer.parseInt(runningDelayMs));
 			Sardine sardine = SardineFactory.begin(webDavLoginUser, webDavLoginPwd);
 			//String rootLevels[] = {"/photos/Man"};
 			
 			out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(FilenameUtils.concat(downloadToPath, DOWNLOAD_FILE_NAME)), "UTF-8"));
 	        
-			/** Genereate the download list in advance **/
-			for(String webDavSrcDir : webDavSrcDirs){
-				try{
+			/** Generate the download list in advance **/
+			try{
+				for(String webDavSrcDir : webDavSrcDirs){
 					traverseRes(webDavSrcDir, webDavSrcDir, sardine);
-				}catch(Exception e){
-					StringWriter errors = new StringWriter();
-					e.printStackTrace(new PrintWriter(errors));
-					System.out.println(errors.toString());
-					EmailSender.sendEmail(senderEmail, receiverEmail,smtpHost, 
-							"[BackupRobot] Backup failed at " + new Date(),
-							errors.toString());
-					System.exit(1);
-				}finally {
-					out.close();
 				}
+			}catch(Exception e){
+				StringWriter errors = new StringWriter();
+				e.printStackTrace(new PrintWriter(errors));
+				System.out.println(errors.toString());
+				EmailSender.sendEmail(senderEmail, receiverEmail,smtpHost, 
+						"[BackupRobot-"+hostname+"] Backup failed at " + new Date(),
+						errors.toString());
+				System.exit(1);
+			}finally {
+				out.close();
 			}
 			
 			EmailSender.sendEmail(senderEmail, receiverEmail,smtpHost, 
-					"[BackupRobot] Backup started at " + new Date(),
+					"[BackupRobot-"+hostname+"] Backup started at " + new Date(),
 					"Starting to download " + noOfFileToBeDownloaded + " file(s)");
 			System.out.println("Starting to download " + noOfFileToBeDownloaded + " file(s)");
 			
 			/** Download actually **/
 			downloadFiles(sardine);
 			EmailSender.sendEmail(senderEmail, receiverEmail,smtpHost, 
-					"[BackupRobot] Backup completed at " + new Date(),
+					"[BackupRobot-"+hostname+"] Backup completed at " + new Date(),
 					"Finished to download " + noOfFileToBeDownloaded + " file(s)");
 			
+			System.out.println("backup-robot ended at " + new Date());
+			System.out.println("Waiting " + runningIntervalMs + " ms for next round ...");
 			Thread.sleep(Integer.parseInt(runningIntervalMs));
 		}
 		
@@ -138,11 +144,12 @@ public class Executor {
 		receiverEmail = props.getProperty("receiver.email");
 		smtpHost = props.getProperty("smtp.host");
 		runningIntervalMs = props.getProperty("running.interval.ms");
-		runningDelayMs = props.getProperty("running.interval.ms");
+		runningDelayMs = props.getProperty("running.delay.ms");
 	}
 	
 	private static void traverseRes(String path, String rootLevel, Sardine sardine) throws IOException{
-		List<DavResource> resources = sardine.list(UriUtils.encodeHttpUrl(HOST + path, "UTF-8"), 1);
+		//List<DavResource> resources = sardine.list(UriUtils.encodeHttpUrl(HOST + path, "UTF-8"), 1);
+		List<DavResource> resources = sardine.list(HOST + path);
 		int rootLevelCount = 0;
 		for (DavResource res : resources)
 		{

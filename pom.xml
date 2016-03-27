@@ -3,8 +3,8 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>com.manlkm.tools</groupId>
-	<artifactId>BackupRobot</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<artifactId>backup-robot</artifactId>
+	<version>0.9</version>
 	<packaging>jar</packaging>
 
 	<name>BackupRobot</name>
@@ -64,31 +64,77 @@
 			<resource>
 				<directory>${project.basedir}/src/main/resources</directory>
 				<filtering>true</filtering>
-				<includes>
-					<include>**/*.properties</include>
-				</includes>
+				<excludes>
+					<exclude>**/*.properties</exclude>
+					<exclude>**/*.properties.sample</exclude>
+				</excludes>
 			</resource>
 		</resources>
 		<plugins>
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>exec-maven-plugin</artifactId>
-				<version>1.1.1</version>
-				<executions>
-					<execution>
-						<phase>test</phase>
-						<goals>
-							<goal>java</goal>
-						</goals>
-						<configuration>
-							<mainClass>com.manlkm.tools.BackupRobot.Executor</mainClass>
-							<arguments>
-								<argument>/home/manlkm/workspace/BackupRobot/src/main/resources/config.properties</argument> 
-							</arguments>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
+			<!-- execute:
+				mvn exec:java -Dexec.mainClass="com.manlkm.tools.BackupRobot.Executor" -Dexec.args="/home/manlkm/workspace/BackupRobot/src/main/resources/config.properties"
+			 -->
+		      <plugin>
+		        <groupId>org.apache.maven.plugins</groupId>
+		        <artifactId>maven-shade-plugin</artifactId>
+		        <version>2.4.3</version>
+		        <executions>
+		          <execution>
+		            <phase>package</phase>
+		            <goals>
+		              <goal>shade</goal>
+		            </goals>
+		            <configuration>
+		              <transformers>
+		                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+		                  <mainClass>com.manlkm.tools.BackupRobot.Executor</mainClass>
+		                </transformer>
+		              </transformers>
+		            </configuration>
+		          </execution>
+		        </executions>
+		      </plugin>
+		      <plugin>
+                <groupId>com.akathist.maven.plugins.launch4j</groupId>
+                <artifactId>launch4j-maven-plugin</artifactId>
+                <version>1.5.2</version>
+                <executions>
+                    <execution>
+                        <id>l4j-console</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>launch4j</goal>
+                        </goals>
+                        <configuration>
+                            <headerType>console</headerType>
+                            <outfile>target/${project.artifactId}.exe</outfile>
+                            <jar>target/${project.artifactId}-${project.version}.jar</jar>
+                            <!-- if <dontWrapJar>true</dontWrapJar> change to this conf <jar>${project.artifactId}-${project.version}.jar</jar> -->
+                            <dontWrapJar>false</dontWrapJar>
+                            <errTitle>Error in launch4j plugin</errTitle>
+                            <classPath>
+                                <mainClass>com.manlkm.tools.BackupRobot.Executor</mainClass>
+                            </classPath>
+                            <icon>src/main/resources/backup_robot.ico</icon>
+                            <jre>
+                                <minVersion>1.6.0</minVersion>
+                            </jre>
+                            <versionInfo>
+                                <fileVersion>1.0.0.0</fileVersion>
+                                <txtFileVersion>1.0.0.0</txtFileVersion>
+                                <fileDescription>Backup Robot</fileDescription>
+                                <copyright>Copyright (c) 2016 </copyright>
+                                <companyName>manlkm.com</companyName>
+                                <productVersion>0.0.0.1</productVersion>
+                                <txtProductVersion>${project.version}</txtProductVersion>
+                                <productName>${project.artifactId}</productName>
+                                <internalName>${project.artifactId}</internalName>
+                                <originalFilename>${project.artifactId}.exe</originalFilename>
+                            </versionInfo>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
 		</plugins>
 	</build>
 
